@@ -191,7 +191,7 @@ Use the prompts below as a short reflection section for the capstone record:
 
 ## Project links
 
-- Production URL: [TBD]
-- GitHub repository: [TBD]
+- Production URL: https://chain-proof-omega.vercel.app/
+- GitHub repository: https://github.com/ASH-2030/ChainProof
 
 These placeholders should be replaced with the final live URL and repository link when they are available.
