@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { analyzeFindingsWithGemini } from '../src/server/geminiAnalysis'
+import { analyzeFindingsWithGemini } from '../src/server/geminiAnalysis.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

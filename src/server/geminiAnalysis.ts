@@ -3,7 +3,7 @@ import {
   assertChainAnalysisResponse,
   type AnalysisRequest,
   validateAnalysisRequest,
-} from './analysisValidation'
+} from './analysisValidation.js'
 
 function buildAnalysisPrompt(findings: AnalysisRequest['findings']): string {
   const findingEntries = findings
