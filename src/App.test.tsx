@@ -4,6 +4,7 @@ import App from './App'
 
 describe('App', () => {
   beforeEach(() => {
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
@@ -84,6 +85,59 @@ describe('App', () => {
 
     expect(createObjectURLSpy).toHaveBeenCalledTimes(1)
     expect(anchorClickSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('persists newly added findings and restores saved data on startup', () => {
+    const { unmount } = render(<App />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /add finding/i })[0])
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: 'Missing Security Headers' },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: /severity/i }), {
+      target: { value: 'High' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: /affected asset \/ url/i }), {
+      target: { value: 'https://app.example.com/' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: /description/i }), {
+      target: { value: 'The app does not set security response headers.' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: /^evidence$/i }), {
+      target: { value: 'HTTP response inspection confirms missing X-Frame-Options and Content-Security-Policy.' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^save finding$/i }))
+
+    const savedFindings = JSON.parse(localStorage.getItem('chainproof-findings') ?? '[]')
+    expect(savedFindings.some((finding: { title: string }) => finding.title === 'Missing Security Headers')).toBe(true)
+
+    const savedAnalysis = {
+      summary: 'Saved analysis summary',
+      relationships: [
+        {
+          title: 'Saved relationship',
+          source: 'evidence-supported',
+          confidence: 'high',
+          evidence: ['Saved evidence'],
+          missingPrerequisites: ['Review in staging'],
+          reasoning: 'Saved reasoning.',
+          safeValidation: ['Saved validation'],
+        },
+      ],
+      uncertainties: ['Saved uncertainty'],
+      safeValidationSteps: ['Saved step'],
+      generatedAt: '2026-10-26T00:00:00.000Z',
+    }
+
+    localStorage.setItem('chainproof-analysis', JSON.stringify(savedAnalysis))
+    unmount()
+
+    render(<App />)
+    fireEvent.click(screen.getAllByRole('button', { name: /findings/i })[0])
+
+    expect(screen.getByText(/missing security headers/i)).toBeInTheDocument()
+    expect(screen.getByText(/saved analysis summary/i)).toBeInTheDocument()
   })
 
   it('requests Gemini analysis for the selected finding set', async () => {

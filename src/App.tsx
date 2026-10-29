@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { ChainProofLogo } from './components/ChainProofLogo'
 
@@ -102,6 +102,9 @@ const demoFindings: Finding[] = [
   },
 ]
 
+const STORAGE_FINDINGS_KEY = 'chainproof-findings'
+const STORAGE_ANALYSIS_KEY = 'chainproof-analysis'
+
 const emptyForm: FormState = {
   title: '',
   severity: '',
@@ -112,6 +115,79 @@ const emptyForm: FormState = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isFinding(value: unknown): value is Finding {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.severity === 'string' &&
+    ['Critical', 'High', 'Medium', 'Low'].includes(value.severity) &&
+    typeof value.asset === 'string' &&
+    typeof value.description === 'string' &&
+    typeof value.evidence === 'string' &&
+    (value.source === 'manual' || value.source === 'imported') &&
+    typeof value.createdAt === 'string' &&
+    (typeof value.importedFrom === 'undefined' || typeof value.importedFrom === 'string')
+  )
+}
+
+function isFindingArray(value: unknown): value is Finding[] {
+  return Array.isArray(value) && value.every(isFinding)
+}
+
+function readStorageJSON<T>(key: string, validator: (value: unknown) => value is T): T | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw)
+    return validator(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function writeStorageJSON<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Ignore browser storage errors and continue with in-memory state.
+  }
+}
+
+function removeStorageValue(key: string): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    // Ignore browser storage errors and continue with in-memory state.
+  }
+}
+
+function loadSavedFindings(): Finding[] {
+  return readStorageJSON(STORAGE_FINDINGS_KEY, isFindingArray) ?? demoFindings
+}
+
+function loadSavedAnalysis(): GeminiAnalysisResult | null {
+  return readStorageJSON(STORAGE_ANALYSIS_KEY, isGeminiAnalysisResponse)
 }
 
 function formatDate(date: Date): string {
@@ -207,14 +283,27 @@ function parseZapperReport(reportText: string): Finding[] {
 function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [activeView, setActiveView] = useState<ViewKey>('overview')
-  const [findings, setFindings] = useState<Finding[]>(demoFindings)
+  const [findings, setFindings] = useState<Finding[]>(() => loadSavedFindings())
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [formData, setFormData] = useState<FormState>(emptyForm)
   const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [importStatus, setImportStatus] = useState<ImportStatus>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysisResult, setAnalysisResult] = useState<GeminiAnalysisResult | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<GeminiAnalysisResult | null>(() => loadSavedAnalysis())
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+
+  useEffect(() => {
+    writeStorageJSON(STORAGE_FINDINGS_KEY, findings)
+  }, [findings])
+
+  useEffect(() => {
+    if (analysisResult) {
+      writeStorageJSON(STORAGE_ANALYSIS_KEY, analysisResult)
+      return
+    }
+
+    removeStorageValue(STORAGE_ANALYSIS_KEY)
+  }, [analysisResult])
 
   const summary = useMemo(
     () => ({
